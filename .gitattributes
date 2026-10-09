@@ -1,0 +1,5 @@
+# 统一换行符：仓库和工作区都用 LF。
+# 这条的优先级高于各机器本地的 core.autocrlf（本机是 true），所以能压掉
+# 「工作区是 LF、下次检出会变成 CRLF」那类警告，跨系统协作也不会产生假 diff。
+# 功能行（下一行）保持纯 ASCII；text=auto 会自动放过 png 等二进制文件。
+* text=auto eol=lf
