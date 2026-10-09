@@ -1,0 +1,13 @@
+# 密钥：唯一的密文，绝不入库
+.env
+
+# 运行时数据库（含 WAL/SHM 两个伴生文件），备份同理
+surf.db*
+backup/*.db*
+
+# Python
+__pycache__/
+*.pyc
+
+# 临时产物（截图等）
+*.png

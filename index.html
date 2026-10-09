@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>阿浪 · B 站游戏区冲浪日志</title>
+<style>
+/* ============================================================ 设计说明
+   这一页是一本值班日志。左边是日志正文（每一轮「出门」写成一条），
+   右边是操作台的仪表（对话、口味、对照实验）。
+
+   一条贯穿全页的规则：宋体 = 阿浪写下的字（日记、他说的话），
+   黑体 = 系统量出来的数（时间、分数、播放量、按钮）。
+   字体本身就是「谁在说话」的标记，所以两边都不加称呼标签。
+
+   颜色只有两种颜料，都有语义，不做装饰：
+     青 #1A6480 —— 活的 / 你的 / 想多看
+     茜 #8E3A46 —— 腻了 / 这一轮失败了
+   ============================================================ */
+:root{
+  --paper:#E5E7DE;   /* 记录纸，微绿的灰，不是奶油色也不是办公室冷灰 */
+  --panel:#EFF1E9;
+  --sunk:#DFE3D6;
+  --ink:#171A15;
+  --ink-2:#4E5449;
+  --ink-3:#62675B;   /* 元信息色，对纸底的对比度 4.7:1 */
+  --head:118px;      /* 报头实际高度，JS 会量一次覆盖掉 */
+  --rule:#C3C7B9;
+  --rule-2:#D8DBCD;
+  --live:#1A6480;
+  --dull:#8E3A46;
+  --serif:"Source Han Serif SC","Noto Serif SC","Songti SC","STSong","思源宋体",SimSun,serif;
+  --sans:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+  --r:3px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--paper);color:var(--ink);font:14px/1.6 var(--sans);
+     -webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+a{color:inherit;text-decoration:none}
+a:hover .vt{text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--live);outline-offset:2px;border-radius:1px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+
+button{font:inherit;color:inherit;background:none;border:1px solid var(--rule);border-radius:var(--r);
+       padding:5px 11px;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+button:hover:not(:disabled){border-color:var(--ink-2);color:var(--ink)}
+button:disabled{opacity:.4;cursor:default}
+.btn-primary{background:var(--live);border-color:var(--live);color:#fff;padding:6px 15px}
+.btn-primary:hover:not(:disabled){background:#155670;border-color:#155670;color:#fff}
+.btn-primary[data-busy]{background:var(--panel);border-color:var(--live);color:var(--live)}
+
+/* ---------------------------------------------------------- 报头 */
+/* 报头钉住：读长日志时「下次出门」的钟和按钮一直够得着 */
+.masthead{padding:16px 24px 13px;border-bottom:1px solid var(--rule);background:var(--paper);
+          position:sticky;top:0;z-index:5}
+.inner{max-width:1560px;margin:0 auto}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.who{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;min-width:0}
+.who h1{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:.1em;line-height:1.1}
+.who p{color:var(--ink-3);font-size:12px}
+.who p b{color:var(--ink-2);font-weight:600}
+.actions{display:flex;gap:8px;flex-shrink:0}
+
+.band{display:flex;align-items:flex-end;gap:28px;flex-wrap:wrap;margin-top:13px}
+.readouts{display:flex;gap:24px;flex-wrap:wrap}
+.readout{font-size:12px;color:var(--ink-3);white-space:nowrap}
+.readout b{font-size:16px;font-weight:600;color:var(--ink);margin-left:7px;letter-spacing:-.01em}
+.readout b.live{color:var(--live)}
+.readout b small{font-size:12px;font-weight:400;color:var(--ink-3);margin-left:1px}
+/* 用量只剩数字，刻度条去掉了。原来那条尺还兼着「快用完了」的警示，
+   改成数字自己变色——信息留住，占位让出来 */
+.readout b.warn{color:var(--dull)}
+
+/* ---------------------------------------------------------- 版式 */
+main{display:grid;align-items:start;max-width:1560px;margin:0 auto;
+     grid-template-columns:minmax(0,1fr) 380px;
+     grid-template-areas:"ablate ablate" "taste taste" "log rail"}
+.ablate{grid-area:ablate}
+.log{grid-area:log}
+.rail{grid-area:rail}
+.log{--w:660px;min-width:0;padding:26px 30px 64px 24px}
+.log h2,.log #log{max-width:var(--w)}   /* 字号降了一档，正文跟着收，每行还是四十几字 */
+/* 右栏贴着报头下沿钉住，高度正好把剩下的视口用满——不留缝也不被裁掉 */
+.rail{min-width:0;border-left:1px solid var(--rule);background:var(--panel);
+      position:sticky;top:var(--head);height:calc(100vh - var(--head));
+      display:flex;flex-direction:column;
+      padding:22px 22px 18px;gap:18px;overflow:hidden}
+
+h2{font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:.04em;
+   color:var(--ink);display:flex;align-items:center;gap:12px;margin-bottom:13px}
+h2::after{content:"";flex:1;height:1px;background:var(--rule)}
+h2 .n{font-family:var(--sans);font-size:11px;font-weight:400;color:var(--ink-3);letter-spacing:0}
+
+/* ---------------------------------------------------------- 日志 */
+/* 报头钉住了，跳转时要把它让出来 */
+.round,.ablate{scroll-margin-top:calc(var(--head) + 14px)}
+.round{position:relative;padding:0 0 30px 24px;border-left:1px solid var(--rule)}
+.round:last-child{border-left-color:transparent}
+.round::before{content:"";position:absolute;left:-3.5px;top:5px;width:7px;height:7px;
+               border-radius:50%;background:var(--ink);box-shadow:0 0 0 3px var(--paper)}
+.round.trig-user::before,.round.trig-manual::before{background:var(--live)}
+.round.bad::before{background:var(--dull)}
+.round.jot{padding-bottom:16px;border-left-color:transparent}
+.round.jot::before{width:5px;height:5px;left:-2.5px;background:var(--ink-3)}
+
+.stamp{display:flex;align-items:baseline;gap:10px;font-size:11.5px;color:var(--ink-3);
+       font-variant-numeric:tabular-nums;margin-bottom:7px}
+.stamp .kind{color:var(--ink-2)}
+.stamp .flag{color:var(--live);font-weight:600}
+.stamp .flag.dull{color:var(--dull)}
+
+.note{font-family:var(--serif);font-size:15px;line-height:1.9;white-space:pre-wrap;color:var(--ink)}
+.round.lead .note{font-size:18px;line-height:1.88;max-width:34em}
+/* 随手记是顺口一句，比正文再小一档；行宽也收窄，不让它拖成一条长线 */
+.round.jot .note{font-size:13.5px;line-height:1.85;color:var(--ink-2);max-width:34em}
+.round.bad .note{font-size:13px;color:var(--dull);font-family:var(--sans)}
+
+/* 新一轮到达时不做位移，只像 diff 一样亮一下再褪掉——回答「变了什么」 */
+@keyframes arrive{from{background:rgba(26,100,128,.11)}to{background:transparent}}
+.round.fresh{animation:arrive 3.2s ease-out both}
+.round.fresh::before{box-shadow:0 0 0 3px rgba(26,100,128,.2)}
+
+/* ---- 底稿：这一轮动过什么、读了什么。字号降一档，表示是证据不是正文 ---- */
+.evidence{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule-2)}
+.trail{font-size:11.5px;color:var(--ink-3);line-height:1.85;margin-bottom:12px}
+.trail b{color:var(--ink-2);font-weight:400}
+.trail em{font-style:normal;color:var(--ink-2)}
+.trail .sep{color:var(--rule);margin:0 9px}
+
+.reads-head{font-size:11.5px;color:var(--ink-3);margin-bottom:4px;font-variant-numeric:tabular-nums}
+/* 展开的箭头：拿边框画一个三角，不指望字体里正好有 ▸。
+   旋转由上面那条全局的 prefers-reduced-motion 一并关掉 */
+summary.reads-head{display:flex;align-items:center;gap:6px;cursor:pointer;
+                   user-select:none;list-style:none}
+summary.reads-head::-webkit-details-marker{display:none}
+summary.reads-head::marker{content:""}
+summary.reads-head::before{content:"";width:0;height:0;flex:none;
+  border-left:5px solid currentColor;border-top:4px solid transparent;
+  border-bottom:4px solid transparent;transform-origin:35% 50%;
+  transition:transform .18s}
+.reads[open]>summary.reads-head::before{transform:rotate(90deg)}
+summary.reads-head:hover{color:var(--ink-2)}
+
+.vid{display:flex;gap:11px;padding:9px 0;border-top:1px solid var(--rule-2);align-items:flex-start}
+.vid:first-of-type{border-top:none}
+.vid img{width:100px;height:63px;object-fit:cover;flex:none;background:var(--sunk);
+         border-radius:2px;display:block}
+.vid .meta{min-width:0;flex:1}
+.vid .vt{font-family:var(--serif);font-size:13px;line-height:1.5;
+         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vid .a{font-size:12px;color:var(--ink-3);margin-top:3px;line-height:1.6}
+.vid .a .tag{color:var(--ink-2)}
+.vid .vote{display:flex;gap:5px;flex:none}
+.vid .vote button{padding:2px 8px;font-size:11.5px;color:var(--ink-2)}
+.vid .vote button.down:hover:not(:disabled){border-color:var(--dull);color:var(--dull)}
+/* 投过票之后按钮的位置换成一行批注，横跨整行——理由动辄 60 字，塞进侧栏会碎成一列 */
+.vid{flex-wrap:wrap}
+.verdict{flex:0 0 100%;margin:7px 0 0 111px;font-size:11.5px;line-height:1.7;color:var(--ink-3);
+         padding-left:9px;border-left:2px solid var(--live)}
+.verdict.down{border-left-color:var(--dull)}
+.verdict b{color:var(--live);font-weight:600}
+.verdict.down b{color:var(--dull)}
+.verdict>*+*{margin-left:14px}
+
+.empty{font-family:var(--serif);font-size:15px;color:var(--ink-3);padding:6px 0}
+
+/* ---------------------------------------------------------- 对话 */
+.chat{display:flex;flex-direction:column;flex:1 1 auto;min-height:170px}
+/* 一句话都还没有的时候，别把这空盒子撑满整屏——把输入框和空话都留在手边 */
+.chat:has(.empty){flex:0 0 auto}
+/* position:relative 不只是为了定位——它给消息里那个 1px 的读屏标签当定位祖先。
+   没有它，absolute 的标签会逃出这个滚动区、落到整个文档上，消息一多就撑出假溢出 */
+.msgs{flex:1 1 auto;min-height:0;overflow-y:auto;position:relative;
+      display:flex;flex-direction:column;gap:13px;
+      padding-right:6px;margin-bottom:12px;scrollbar-width:thin}
+/* 翻上去之后顶边那条被切断的旧消息会像一块无字的灰砖，让它淡出去 */
+.msgs[data-cut]{mask-image:linear-gradient(to bottom,transparent,#000 24px)}
+/* 他说的话是宋体，你说的话是黑体——不用加名字 */
+.told{font-family:var(--serif);font-size:15px;line-height:1.85;white-space:pre-wrap}
+.said{align-self:flex-end;max-width:88%;background:var(--sunk);border-radius:var(--r);
+      padding:7px 11px;font-size:13.5px;line-height:1.7;color:var(--ink-2);white-space:pre-wrap}
+.thinking{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:7px}
+.thinking i{width:5px;height:5px;border-radius:50%;background:var(--live);display:inline-block;
+            animation:blink 1.1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.told.new{animation:fade .6s ease both}
+#chatform{display:flex;gap:7px}
+#chatform input{flex:1;min-width:0;font:inherit;font-size:13.5px;background:var(--paper);
+                border:1px solid var(--rule);border-radius:var(--r);padding:8px 11px;color:var(--ink)}
+#chatform input::placeholder{color:var(--ink-3)}
+#chatform input:focus{outline:none;border-color:var(--live);box-shadow:0 0 0 2px rgba(26,100,128,.14)}
+
+/* ---------------------------------------------------------- 口味 */
+/* 单独一条通栏：主题横排成一条谱，左端最想多看，往右递减。
+   分数条和「点开看理由」都让给了行宽——理由挂在 title 上，鼠标停上去还在。
+   颜色从原来的条子挪到了分数上：青的是想多看，茜的是腻了。 */
+.taste-band{grid-area:taste;padding:20px 24px 17px;border-bottom:1px solid var(--rule)}
+.taste-strip{display:flex;flex-wrap:wrap;gap:4px 22px}
+.taste{display:flex;align-items:baseline;gap:6px;padding:2px 0;min-width:0}
+.taste .tp{font-family:var(--serif);font-size:13px;color:var(--ink);white-space:nowrap;
+           overflow:hidden;text-overflow:ellipsis;max-width:13em}
+.taste .sc{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;flex:none}
+.taste.up .sc{color:var(--live)}
+.taste.down .sc{color:var(--dull)}
+.taste.down .tp{color:var(--ink-2)}
+
+.taste-band .legend{font-size:11.5px;color:var(--ink-3);line-height:1.7;margin-top:10px}
+
+/* ---------------------------------------------------------- 对照实验 */
+.ablate{background:var(--panel);border-bottom:1px solid var(--rule);padding:22px 24px 24px}
+.ablate-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:4px}
+.ablate-head h2{margin-bottom:0;flex:1}
+.ablate-lead{font-size:13px;color:var(--ink-2);margin-bottom:16px;max-width:74ch;line-height:1.75}
+.ablate-lead em{font-style:normal;color:var(--live)}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:26px;max-width:1080px}
+.pair>div{min-width:0}
+.pair h3{font-family:var(--serif);font-size:14px;font-weight:600;margin-bottom:3px}
+.pair h3 .how{font-family:var(--sans);font-size:11.5px;font-weight:400;color:var(--ink-3);margin-left:6px}
+.pair .sum{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-bottom:8px}
+.pair li{list-style:none;font-size:12px;color:var(--ink-2);padding:3px 0;
+         border-top:1px solid var(--rule-2);font-variant-numeric:tabular-nums;
+         display:flex;gap:8px;line-height:1.6}
+.pair li:first-of-type{border-top:none}
+.pair li .tl{flex:none;width:74px;color:var(--ink-3)}
+.pair li span{min-width:0}
+/* 分歧用左侧一道朱线标出，不动版面，两列的工具名因此始终对齐 */
+.pair li.only{color:var(--ink);border-left:2px solid var(--dull);padding-left:9px;
+              margin-left:-11px}
+.diff{margin-top:16px;padding-top:13px;border-top:1px solid var(--rule);font-size:12.5px;
+      line-height:1.8;color:var(--ink-2)}
+.diff b{color:var(--dull);font-weight:600}
+.ablate-actions{margin-top:14px}
+
+/* ---------------------------------------------------------- 窄屏 */
+/* 单列之后把对话提到日志前面：手机上先够得着说话，再慢慢往下读日志。
+   口味谱在窄屏要摊成四五排、占掉小半屏，所以排在对话后面，
+   否则一眼看到的全是主题名，得往下划才够得着输入框 */
+@media (max-width:1120px){
+  main{grid-template-columns:minmax(0,1fr);
+       grid-template-areas:"ablate" "rail" "taste" "log"}
+  /* 单列时报头占掉四成屏高，钉住只会在日志上盖一层，取消 */
+  .masthead{position:static}
+  .rail{position:static;height:auto;border-left:none;border-top:1px solid var(--rule);
+        display:flex;flex-direction:column;padding:22px 24px 20px}
+  /* 右栏铺满整屏之后，对话收成一栏，不然一句回复会拉成八十字宽的一行 */
+  .chat{max-width:34rem}
+  .msgs{max-height:46vh}
+  .log{--w:none;padding:24px 24px 44px}
+}
+@media (max-width:640px){
+  .masthead{padding:13px 16px 11px}
+  .who h1{font-size:22px}
+  .who p{display:none}              /* 手机上留出高度给日志，身份说明让位 */
+  .band{margin-top:10px;gap:12px}
+  .readouts{gap:14px 18px}
+  .readout b{font-size:15px}
+  .log,.rail,.ablate,.taste-band{padding-left:16px;padding-right:16px}
+  .round{padding-left:18px;padding-bottom:24px}
+  .round.lead .note{font-size:15.5px}
+  .note{font-size:14px}
+  .vid img{width:76px;height:48px}
+  .vid .vote{width:100%;justify-content:flex-start;margin-top:4px}
+  .verdict{margin-left:0}
+  .pair{grid-template-columns:1fr;gap:18px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .round.fresh{background:rgba(26,100,128,.09)}
+}
+</style>
+</head>
+<body>
+
+<p class="sr" id="sr-status" role="status" aria-live="polite"></p>
+
+<header class="masthead">
+  <div class="inner">
+  <div class="top">
+    <div class="who">
+      <h1>阿浪</h1>
+      <p>每天在 B 站游戏区晃一圈的人。每 <b id="m-interval">—</b> 自己出门一趟，一轮最多精读 <b id="m-limit">—</b> 条，其余都看他当时想不想。</p>
+    </div>
+    <div class="actions">
+      <button id="b-surf" class="btn-primary">让他出门</button>
+      <button id="b-ablate">对照实验</button>
+    </div>
+  </div>
+  <div class="band">
+    <div class="readouts">
+      <div class="readout">下次出门<b id="s-next" class="num">—</b></div>
+      <div class="readout">上次出门<b id="s-last" class="num">—</b></div>
+      <div class="readout">今日用量<b id="s-tok" class="num">—</b></div>
+    </div>
+  </div>
+  </div>
+</header>
+
+<main>
+  <section class="ablate" id="ablate" hidden></section>
+
+  <section class="taste-band" aria-label="他的口味">
+    <h2>他的口味<span class="n" id="taste-count"></span></h2>
+    <div class="taste-strip" id="taste"><p class="empty">还没形成。</p></div>
+    <p class="legend" id="taste-legend">分数青的是想多看，茜的是腻了。鼠标停在一条上，能看他为什么这么打分。</p>
+  </section>
+
+  <section class="log" aria-label="冲浪日志">
+    <h2>冲浪日志<span class="n" id="log-count"></span></h2>
+    <div id="log"></div>
+  </section>
+
+  <aside class="rail">
+    <div class="chat">
+      <h2>跟他说话</h2>
+      <div class="msgs" id="msgs"><p class="empty">他还没开过口。问一句试试。</p></div>
+      <form id="chatform">
+        <input id="chat-in" autocomplete="off" maxlength="500"
+               placeholder="问他今天刷到什么了…" aria-label="给阿浪发消息">
+        <button type="submit">说</button>
+      </form>
+    </div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const GAME = {4:"游戏区",17:"单机游戏",171:"电子竞技",172:"手机游戏",65:"网络游戏",173:"桌游棋牌",136:"音游"};
+const CLOCK = {auto:"自己出门", user:"你说完话之后出门", manual:"你按的出门", ablation:"对照实验空跑",
+               surf:"出门", jot:"随手记"};
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(r.status);
+  return r.headers.get("content-type")?.includes("json") ? r.json() : r.text();
+}
+const post = (path, body) => api(path, {method:"POST", headers:{"Content-Type":"application/json"},
+                                        body: body ? JSON.stringify(body) : undefined});
+
+/* 内容全部来自模型和 B 站，一律用 textContent 构造节点，绝不拼 innerHTML */
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+const hhmm = ts => new Date(ts * 1000).toLocaleTimeString("zh-CN",
+  {hour:"2-digit", minute:"2-digit", hour12:false});
+const dayStamp = ts => {
+  const d = new Date(ts * 1000), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay ? hhmm(ts)
+                 : `${d.getMonth()+1}月${d.getDate()}日 ${hhmm(ts)}`;
+};
+/* 播放量按中文习惯走万，而不是七位数 */
+const plays = n => !n ? "0" : n >= 1e4 ? (n / 1e4).toFixed(n >= 1e5 ? 0 : 1) + "万" : String(n);
+const list = (a, n = 6) => !a.length ? "（没有）"
+  : a.slice(0, n).map(x => `「${x}」`).join("、") + (a.length > n ? ` 等 ${a.length} 个` : "");
+
+/* ============================================================ 日志
+   一轮「出门」是一个整体：先做了什么 → 读了哪些 → 写下什么。
+   视频按时间落回它所属的那一轮，所以投票永远发生在产生它的语境里。 */
+function groupRounds(diary, videos) {
+  const asc = diary.filter(r => r.trigger !== "jot").slice().reverse();  // 早 → 晚
+  const host = new Map();                                                // ts -> 视频
+  asc.forEach(r => host.set(r.ts, []));
+  const loose = [];
+  videos.forEach(v => {
+    // 视频入库时间落在某一轮区间内就算它的；区间下限最多往前 20 分钟，
+    // 免得只剩一轮时把更早的孤儿视频全吸过去
+    const i = asc.findIndex(r => r.ts >= v.created_at);
+    if (i < 0) { loose.push(v); return; }
+    const lo = Math.max(i ? asc[i-1].ts : 0, asc[i].ts - 1200);
+    (v.created_at > lo ? host.get(asc[i].ts) : loose).push(v);
+  });
+  return {host, loose};
+}
+
+function renderTrail(actions) {
+  const box = el("div", "trail");
+  const searches = actions.filter(a => a.tool === "search_videos").map(a => a.arg);
+  const regions = actions.filter(a => a.tool === "browse_region")
+                         .map(a => String(a.arg).split(":")[1] || a.arg);
+  const reads = actions.filter(a => a.tool === "read_video").length;
+  const recalls = actions.filter(a => a.tool === "recall_memory").map(a => a.arg);
+  const tweaks = actions.filter(a => a.tool === "update_interest").map(a => a.arg);
+  const parts = [];
+  if (searches.length) parts.push(["搜了", list(searches)]);
+  if (regions.length) parts.push(["刷了", list(regions)]);
+  if (recalls.length) parts.push(["翻了记忆", list(recalls)]);
+  if (reads) parts.push(["精读", `${reads} 条`]);
+  if (tweaks.length) parts.push(["调了口味", list(tweaks)]);
+  if (!parts.length) { box.append(el("b", null, "这轮没动工具，只是想了想。")); return box; }
+  parts.forEach(([k, v], i) => {
+    if (i) box.append(el("span", "sep", "│"));
+    box.append(el("b", null, k + " "), el("em", null, v));
+  });
+  return box;
+}
+
+const voted = {};   // bvid -> {value, topic, reason}，本地记着，重画时就不用求后端
+
+function videoRow(v, onVote) {
+  const row = el("div", "vid");
+  const img = document.createElement("img");
+  img.src = v.bvid ? `https://i0.hdslb.com/bfs/archive/${v.bvid}.jpg` : "";
+  img.alt = ""; img.loading = "lazy";
+  img.onerror = () => { img.style.visibility = "hidden"; };  // 封面拿不到就留白，不显示破图
+
+  const meta = el("div", "meta");
+  const link = el("a", null, null);
+  link.href = v.url || `https://www.bilibili.com/video/${v.bvid}`;
+  link.target = "_blank"; link.rel = "noopener noreferrer";
+  link.append(el("div", "vt", v.title), el("span", "sr", "（在 B 站打开）"));
+  // 作者名后面直接跟数字会连读，用一个间隔符断开
+  const bits = [v.author || "?", v.tname, `${plays(v.view)} 播放`].filter(Boolean);
+  const a = el("div", "a", bits.join(" · "));
+  const tags = (v.tags || "").split("/").filter(Boolean).slice(0, 3);
+  if (tags.length) a.append(el("div", "tag", tags.join("、")));
+  meta.append(link, a);
+
+  row.append(img, meta);
+
+  // 投过票的视频直接显示它「听懂成什么」，刷新也不回头——否则每 5 秒轮询一次就闪没了
+  if (voted[v.bvid]) { row.append(verdictNode(voted[v.bvid])); return row; }
+  const vote = el("div", "vote");
+  [["多看", 1], ["腻了", -1]].forEach(([label, value]) => {
+    const b = el("button", value < 0 ? "down" : null, label);
+    b.type = "button";
+    b.title = value > 0 ? "以后多推这类" : "以后别推这类";
+    b.onclick = () => onVote(v, value, vote, b);
+    vote.append(b);
+  });
+  row.append(vote);
+  return row;
+}
+
+function verdictNode(rec) {
+  const out = el("div", "verdict" + (rec.value < 0 ? " down" : ""));
+  if (rec.topic) {
+    out.append(el("b", null, `记成「${rec.topic}」`));
+    if (rec.reason) out.append(el("span", null, rec.reason));
+  } else {
+    out.append(el("span", null, "没连上主题，记下了但没动口味"));
+  }
+  out.append(el("span", null, rec.value < 0 ? "这类以后少推" : "这类以后多推"));
+  return out;
+}
+
+async function vote(v, value, vote, btn) {
+  const buttons = [...vote.querySelectorAll("button")];
+  buttons.forEach(x => x.disabled = true);
+  btn.setAttribute("aria-pressed", "true");
+  try {
+    const r = await post("/api/feedback", {bvid: v.bvid, value});
+    voted[v.bvid] = {value, topic: r.topic, reason: r.reason};
+    vote.replaceWith(verdictNode(voted[v.bvid]));
+    say(`记住了「${r.topic || "这条"}」，30 秒后他会带着这个印象再出门。`);
+    // 只有口味画像变了，日志和视频列表没变——别整页重画，那会把这行结果冲掉
+    const s = await api("/api/state");
+    renderState(s); renderTaste(s.interest);
+  } catch (e) {
+    buttons.forEach(x => x.disabled = false);
+    btn.setAttribute("aria-pressed", "false");
+    btn.after(el("span", "verdict", " 没送出去，再点一次。"));
+  }
+}
+
+/* 只有真正新到的条目才亮一下，重复渲染不会反复播动画 */
+let freshTs = new Set(), freshTimer = 0;
+// 一次落好几条时，先到的那条不该把后到的那条正亮着的记号一起收走，
+// 所以每次都重新计时，而不是各排各的闹钟
+function armFreshClear() {
+  clearTimeout(freshTimer);
+  freshTimer = setTimeout(() => freshTs.clear(), 9000);
+}
+/* 点了哪几轮把它展开着，记在这儿。
+   整个日志每 5 秒重画一次（replaceChildren），不记的话点开的那一秒就合上了。 */
+const opened = new Set();
+
+/* 读过什么折进 <details>，箭头点开：正文是日记，视频是底稿，想翻再翻。 */
+function videoBlock(key, head, vids, onVote) {
+  const d = document.createElement("details");
+  d.className = "reads";
+  d.open = opened.has(key);
+  d.addEventListener("toggle", () => d.open ? opened.add(key) : opened.delete(key));
+  const s = document.createElement("summary");
+  s.className = "reads-head";
+  s.textContent = `${head} ${vids.length} 条`;
+  d.append(s);
+  vids.slice().sort((a, b) => b.created_at - a.created_at)
+      .forEach(v => d.append(videoRow(v, onVote)));
+  return d;
+}
+
+function renderLog(rows, videos) {
+  const box = $("#log"), n = $("#log-count");
+  box.replaceChildren();
+  if (!rows.length) {
+    box.append(el("p", "empty", "他还没出过门。按上面的「让他出门」，或者在这儿等他自己想起来。"));
+    n.textContent = "";
+    return;
+  }
+  n.textContent = `${rows.length} 条`;
+  const {host, loose} = groupRounds(rows, videos);
+
+  if (loose.length) {
+    const g = el("article", "round trig-user");
+    g.append(el("div", "stamp", null, null));
+    g.querySelector(".stamp").append(el("span", "kind", "刚读的"));
+    g.querySelector(".stamp").append(el("span", "flag", "他还在外面"));
+    // 他还在外面时这一组是活的，标题里的数字每秒都在变
+    g.append(videoBlock("loose", "已经读了", loose, vote));
+    box.append(g);
+  }
+
+  rows.forEach((r, i) => {
+    const bad = r.trigger !== "jot" && r.text.startsWith("（");
+    const a = el("article", "round" +
+      (r.trigger === "jot" ? " jot" : " trig-" + r.trigger) +
+      (bad ? " bad" : "") + (i === 0 ? " lead" : ""));
+    a.id = "e-" + r.ts;
+    if (freshTs.has(r.ts)) a.classList.add("fresh");
+
+    const stamp = el("div", "stamp");
+    stamp.append(el("span", null, dayStamp(r.ts)), el("span", "kind", CLOCK[r.trigger] || r.trigger));
+    if (bad) stamp.append(el("span", "flag dull", "这一轮失败了"));
+    else if (r.trigger !== "jot" && freshTs.has(r.ts)) stamp.append(el("span", "flag", "新的"));
+    a.append(stamp);
+    a.append(el("p", "note", r.text));
+
+    if (r.trigger !== "jot") {
+      const ev = el("div", "evidence");
+      let acts = [];
+      try { acts = JSON.parse(r.actions || "[]"); } catch (_) {}
+      if (acts.length) ev.append(renderTrail(acts));
+      const vids = host.get(r.ts) || [];
+      // 没读视频就没东西可展开，别摆一个点开是空的箭头
+      ev.append(vids.length ? videoBlock(r.ts, "这一轮读了", vids, vote)
+                            : el("div", "reads-head", "这一轮没读书"));
+      a.append(ev);
+    }
+    box.append(a);
+  });
+}
+
+/* ============================================================ 对话 */
+let chatPending = false;
+function renderChat(rows) {
+  const box = $("#msgs");
+  // 重画之前先量：你在读上面哪一段。5 秒一次的轮询不该动你的视口，
+  // 也不该在你贴着底的时候把你落下。
+  const at = box.scrollTop;
+  const nearBottom = box.scrollHeight - at - box.clientHeight < 40;
+  box.replaceChildren();
+  if (!rows.length) {
+    box.append(el("p", "empty", "他还没开过口。问一句试试。"));
+    markCut(box); return;
+  }
+  rows.forEach(m => {
+    const mine = m.role === "user";
+    const d = el("div", mine ? "said" : "told", m.content);
+    d.append(el("span", "sr", mine ? "你：" : "阿浪："));
+    box.append(d);
+  });
+  box.scrollTop = nearBottom ? box.scrollHeight : at;
+  markCut(box);
+}
+
+// 上面确实还压着旧消息时，顶边才需要那条淡出，否则那是一条无字的灰砖
+function markCut(box) {
+  box.toggleAttribute("data-cut", box.scrollTop > 4);
+}
+$("#msgs").addEventListener("scroll", e => markCut(e.currentTarget), {passive: true});
+
+/* ============================================================ 口味 */
+function renderTaste(rows) {
+  const box = $("#taste"), n = $("#taste-count");
+  box.replaceChildren();
+  n.textContent = rows.length ? `${rows.length} 个主题` : "";
+  $("#taste-legend").hidden = !rows.length;   // 没有主题就别解释怎么看主题
+  if (!rows.length) { box.append(el("p", "empty", "还没形成。等他出门回来就有了。")); return; }
+  // 一到一名顺着分数排下去，横向读就是他的口味谱。理由塞不下，挂 title 上。
+  // 不截断：标题写着「17 个主题」却只摆 12 条，是明着骗人
+  rows.forEach(r => {
+    const cls = r.score >= 1 ? "up" : r.score < .45 ? "down" : "";
+    const s = el("span", "taste " + cls);
+    s.append(el("span", "tp", r.topic), el("span", "sc num", r.score.toFixed(2)));
+    if (r.reason) s.title = `${r.topic} ${r.score.toFixed(2)}——${r.reason}`;
+    box.append(s);
+  });
+}
+
+/* ============================================================ 状态 */
+let nextSurfAt = 0, outSince = 0, lastDiaryTs = 0;
+function renderState(s) {
+  const el0 = $("#s-tok");
+  el0.replaceChildren(document.createTextNode(`${(s.tokens_today/1000).toFixed(1)}k `),
+                      el("small", null, `/ ${(s.token_budget/1000).toFixed(0)}k`));
+  el0.classList.toggle("warn", s.tokens_today / s.token_budget > .85);
+
+  $("#m-interval").textContent = s.interval >= 3600
+    ? `${Math.round(s.interval/3600)} 小时` : `${Math.round(s.interval/60)} 分钟`;
+  $("#m-limit").textContent = s.read_limit;
+
+  $("#s-last").textContent = s.last_surf
+    ? Math.max(0, Math.round((Date.now()/1000 - s.last_surf)/60)) + " 分钟前" : "还没出门";
+  nextSurfAt = Date.now() + s.next_surf_in * 1000;
+}
+
+function tickClock() {
+  const b = $("#s-next");
+  if (outSince) {
+    b.textContent = "正在外面";
+    b.className = "num live";
+    return;
+  }
+  b.className = "num";
+  const left = Math.max(0, Math.round((nextSurfAt - Date.now())/1000));
+  const m = Math.floor(left / 60), sec = left % 60;
+  b.replaceChildren(document.createTextNode(m),
+                    el("small", null, ` 分 ${String(sec).padStart(2,"0")} 秒`));
+}
+
+function say(text) { $("#sr-status").textContent = text; }
+
+/* ============================================================ 对照实验 */
+const TOOL_NAME = {search_videos:"搜索", browse_region:"刷分区", read_video:"精读",
+                   recall_memory:"翻记忆", update_interest:"调口味", jot_note:"随手记"};
+const actKey = a => a.tool === "search_videos" ? String(a.arg).trim()
+                 : a.tool === "browse_region" ? String(a.arg).split(":")[1] : null;
+
+function summarize(acts) {
+  const c = {};
+  acts.forEach(a => c[a.tool] = (c[a.tool] || 0) + 1);
+  return Object.entries(c).sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `${TOOL_NAME[t] || t} ${n}`).join("　");
+}
+
+/* otherKeys 是另一边的搜索词/分区。标出来的是「只有这一边碰过的方向」，
+   那才是两次跑法的真实分歧；只按动作类型比会把所有非搜索动作都误标成独有。 */
+function ablationColumn(label, how, acts, otherKeys) {
+  const col = el("div");
+  const h = el("h3"); h.append(document.createTextNode(label), el("span", "how", how));
+  col.append(h, el("div", "sum num", `${acts.length} 次动作　${summarize(acts)}`));
+  acts.slice(0, 16).forEach(a => {
+    const k = actKey(a);
+    const li = el("li", k && !otherKeys.has(k) ? "only" : "");
+    // 分区的 arg 是 "rid:名字"，展示只用名字
+    const arg = a.tool === "browse_region" ? String(a.arg).split(":")[1] || a.arg : a.arg;
+    li.append(el("span", "tl", TOOL_NAME[a.tool] || a.tool),
+              el("span", null, String(arg).slice(0, 42)));
+    col.append(li);
+  });
+  if (acts.length > 16) {
+    const rest = el("li");
+    rest.append(el("span", null, `…还有 ${acts.length - 16} 次`));
+    col.append(rest);
+  }
+  return col;
+}
+
+async function runAblation(btn) {
+  btn.disabled = true; btn.textContent = "正在跑…";
+  const panel = $("#ablate");
+  try {
+    const r = await post("/api/ablation");
+    const with_ = r.with_feedback || [];
+    const without = r.without_feedback || [];
+    panel.replaceChildren();
+
+    const head = el("div", "ablate-head");
+    const h2 = el("h2", null, "对照实验"); h2.append(el("span", "n", "同一个状态，跑两遍"));
+    head.append(h2);
+    const close = el("button", null, "收起来");
+    close.onclick = () => { panel.hidden = true; panel.replaceChildren(); };
+    head.append(close);
+    panel.append(head);
+
+    const kA = new Set(with_.map(actKey).filter(Boolean));
+    const kB = new Set(without.map(actKey).filter(Boolean));
+    const onlyB = [...kB].filter(k => !kA.has(k) && k.length > 3);
+    const onlyA = [...kA].filter(k => !kB.has(k) && k.length > 3);
+
+    const lead = el("p", "ablate-lead");
+    lead.append(document.createTextNode("两次的唯一差别：左边这次带着你给过的差评记忆，右边这次被剥掉了 feedback 表。"));
+    if (onlyB.length) lead.append(document.createTextNode(" 少了这份记忆，"));
+    if (onlyB.length) lead.append(el("em", null, "它多搜了 " + list(onlyB.slice(0, 4))));
+    if (onlyA.length) lead.append(document.createTextNode("；而记得的那次多搜了 " + list(onlyA.slice(0, 3))));
+    lead.append(document.createTextNode("。"));
+    panel.append(lead);
+
+    const pair = el("div", "pair");
+    pair.append(ablationColumn("记得你的差评", "读了 feedback 表", with_, kB),
+                ablationColumn("失忆的它", "忽略 feedback 表", without, kA));
+    panel.append(pair);
+
+    const diff = el("div", "diff");
+    if (onlyB.length) {
+      diff.append(document.createTextNode("被剥掉记忆之后，它才去碰的方向："));
+      diff.append(el("b", null, list(onlyB.slice(0, 6))));
+    } else if (onlyA.length) {
+      diff.append(document.createTextNode("只有记得差评的那次搜了："));
+      diff.append(el("b", null, list(onlyA.slice(0, 6))));
+    } else {
+      diff.append(document.createTextNode("两次搜的词几乎一样。这一轮的差别不在搜索方向，得看它读的顺序。"));
+    }
+    panel.append(diff);
+    panel.hidden = false;
+    panel.scrollIntoView({behavior:"smooth", block:"nearest"});
+  } catch (e) {
+    panel.replaceChildren(el("p", "empty", "对照实验没跑起来：" + e.message));
+    panel.hidden = false;
+  }
+  btn.textContent = "对照实验"; btn.disabled = false;
+}
+
+/* ============================================================ 主循环 */
+async function load() {
+  try {
+    const [s, log, vids, chatRows] = await Promise.all([
+      api("/api/state"), api("/api/diary"), api("/api/videos"), api("/api/chat")]);
+
+    // 「他在外面」这件事从数据上认，不只认按钮：日志是他回来之后才写的，
+    // 所以有比最新一条日志更新的视频，就是他此刻正在读。刷新页面也不会丢。
+    const newest = (log.find(r => r.trigger !== "jot") || {}).ts || 0;
+    if (!outSince && vids.some(v => v.created_at > newest)) outSince = Date.now();
+
+    renderState(s);
+    renderTaste(s.interest);
+    if (!chatPending) renderChat(chatRows);
+
+    // 出现从没见过的一条：亮一下。这里就地重画而不是再调一次 load，
+    // 否则递归会自己咬自己。
+    // 但「随手记」不是回程票：他总是在读完最后一条之后、写下「出门」之前
+    // 先扔一两句杂想。把它当成这一轮结束，就会在他还在外面的时候报「回来了」、
+    // 把倒计时接回来，五秒后再被那条真的「出门」推翻。跟上面认的是同一条。
+    const head = log[0];
+    if (lastDiaryTs && log.length && head.ts !== lastDiaryTs) {
+      const back = head.trigger !== "jot";
+      freshTs.add(head.ts);
+      armFreshClear();
+      lastDiaryTs = head.ts;
+      if (back) {
+        const wasOut = !!outSince;
+        outSince = 0; tickClock();   // 倒计时接回来
+        const b = $("#b-surf");
+        b.textContent = "让他出门"; b.disabled = false; b.removeAttribute("data-busy");
+        say(wasOut ? "阿浪回来了，写了一条新日志。" : "阿浪又写了一条日志。");
+      } else {
+        // 上面刚认过「他在外面」，所以这句一般是他在外头的独白；
+        // 万一这条随手记是在回程票之后落的，outSince 已经是 0，就别说他在外面
+        say(outSince ? "他还在外面，随手记了一句。" : "阿浪随手记了一句。");
+      }
+      renderLog(log, vids);
+      return;
+    }
+    lastDiaryTs = log.length ? log[0].ts : lastDiaryTs;
+    renderLog(log, vids);
+  } catch (e) { /* 后端重启的那一两秒会失败，下一轮自愈 */ }
+}
+
+(async () => {
+  // 上次关页面之后他新写的那几条，这一次打开时带着高亮出现：
+  // 先把记号做好，再让首屏那一次渲染用它，省掉一次多余的重画。
+  try {
+    const seen = localStorage.getItem("alang_seen");   // 第一次打开时是 null
+    const rows = await api("/api/diary");
+    // 「新的」= 上次看之后他写的。第一次来没有「上次」，那就一条都不标。
+    freshTs = new Set(rows.filter(r => seen !== null && r.ts > Number(seen)).map(r => r.ts));
+    if (rows.length) localStorage.setItem("alang_seen", String(rows[0].ts));
+    if (freshTs.size) armFreshClear();
+  } catch (e) {}
+  await load();
+  setInterval(tickClock, 1000);
+  setInterval(load, 5000);
+})();
+// 右栏的高度是「视口减报头」，报头多高得量出来告诉 CSS
+(() => {
+  const head = document.querySelector(".masthead");
+  const sync = () => document.documentElement.style
+    .setProperty("--head", head.offsetHeight + "px");
+  new ResizeObserver(sync).observe(head);
+  sync();
+})();
+
+$("#b-surf").onclick = async e => {
+  const b = e.currentTarget;
+  b.disabled = true; b.textContent = "叫他了…"; b.setAttribute("data-busy", "");
+  try {
+    await post("/api/surf");
+    outSince = Date.now();
+    tickClock();               // 别等下一秒的定时器，读数立刻换成「正在外面」
+    say("他已经出门了，几秒后看日志。");
+    b.textContent = "正在外面";
+    setTimeout(() => { b.disabled = false; }, 6000);
+  } catch (err) {
+    b.disabled = false; b.textContent = "让他出门"; b.removeAttribute("data-busy");
+    say("没能叫他出门。");
+  }
+};
+
+$("#b-ablate").onclick = e => runAblation(e.currentTarget);
+
+$("#chatform").onsubmit = async e => {
+  e.preventDefault();
+  const input = $("#chat-in"), text = input.value.trim();
+  if (!text || chatPending) return;
+  input.value = ""; input.disabled = true; chatPending = true;
+
+  const box = $("#msgs");
+  if (box.querySelector(".empty")) box.replaceChildren();
+  box.append(el("div", "said", text));
+  const thinking = el("div", "thinking");
+  thinking.append(el("i"), document.createTextNode("他正在想…"));
+  box.append(thinking);
+  box.scrollTop = box.scrollHeight; markCut(box);
+
+  try {
+    const r = await post("/api/chat", {message: text});
+    thinking.replaceWith(el("div", "told new", r.reply || "……"));
+    box.scrollTop = box.scrollHeight; markCut(box);
+    say("阿浪回你了。");
+    // 他三十秒后也会出门，写下的新日志由下一次轮询自己认出来，这里不用做记号
+  } catch (err) {
+    thinking.replaceWith(el("p", "empty", "没送到他那儿，再发一次。"));
+  }
+  chatPending = false; input.disabled = false; input.focus();
+  // 这里不再整页重取：刚收下的那句回复还在原地，5 秒后的轮询自然会
+  // 把状态和日志补齐，也顺手让他那句话的淡入真的看得见
+};
+</script>
+</body>
+</html>
