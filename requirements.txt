@@ -1,0 +1,14 @@
+# NOTE: keep this file ASCII-only.
+# pip decodes requirements.txt with the system locale, not UTF-8. On a
+# GBK-locale Windows box any non-ASCII byte here makes `pip install -r`
+# die with UnicodeDecodeError. Explanatory notes live in README.md.
+#
+# Versions pinned from a known-good env (2026-10-09, Python 3.11.6).
+
+fastapi==0.141.1
+uvicorn==0.52.1
+openai==2.53.0
+pydantic==2.13.4
+numpy==2.3.5
+sentence-transformers==5.7.0
+requests==2.34.2
