@@ -9,5 +9,7 @@ backup/*.db*
 __pycache__/
 *.pyc
 
-# 临时产物（截图等）
+# 临时产物（截图等）：根目录散落的截图别进库
 *.png
+# 但 README 的展示图要进库，上面那条放行 images/ 下的
+!images/*.png
