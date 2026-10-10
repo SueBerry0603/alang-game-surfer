@@ -194,14 +194,36 @@ summary.reads-head:hover{color:var(--ink-2)}
 #chatform input:focus{outline:none;border-color:var(--live);box-shadow:0 0 0 2px rgba(26,100,128,.14)}
 
 /* ---------------------------------------------------------- 口味 */
-/* 单独一条通栏：主题横排成一条谱，左端最想多看，往右递减。
-   分数条和「点开看理由」都让给了行宽——理由挂在 title 上，鼠标停上去还在。
-   颜色从原来的条子挪到了分数上：青的是想多看，茜的是腻了。 */
+/* 单独一条通栏。主题不再平铺，按分数收成三档：青=想多看、灰=说不上、茜=腻了。
+   三档默认都合着——合着时只剩档名和条数，颜色就是分档的记号，所以档名用对应颜色写；
+   点开才铺出这一档的主题。理由塞不下，仍旧挂在 title 上，鼠标停上去还在。 */
 .taste-band{grid-area:taste;padding:20px 24px 17px;border-bottom:1px solid var(--rule)}
-.taste-strip{display:flex;flex-wrap:wrap;gap:4px 22px}
+.taste-strip{display:flex;flex-direction:column}
+.taste-group{border-top:1px solid var(--rule-2)}
+.taste-group:first-child{border-top:none}
+.taste-group>summary{display:flex;align-items:center;gap:8px;cursor:pointer;
+  user-select:none;list-style:none;padding:7px 0;font-size:12.5px;color:var(--ink-2)}
+.taste-group>summary::-webkit-details-marker{display:none}
+.taste-group>summary::marker{content:""}
+/* 三角和日志里的 reads-head 同一套画法：拿边框画，不指望字体里正好有 ▸ */
+.taste-group>summary::before{content:"";width:0;height:0;flex:none;
+  border-left:5px solid currentColor;border-top:4px solid transparent;
+  border-bottom:4px solid transparent;transform-origin:35% 50%;transition:transform .18s}
+.taste-group[open]>summary::before{transform:rotate(90deg)}
+.taste-group>summary:hover,.taste-group[open]>summary{color:var(--ink)}
+.taste-group .gl{font-weight:600}
+.taste-group .gn{margin-left:auto;color:var(--ink-3);font-variant-numeric:tabular-nums}
+/* 三档就是那三种颜色 */
+.taste-group.up .gl{color:var(--live)}
+.taste-group.down .gl{color:var(--dull)}
+/* 铺开的主题排成固定列数的格子：每行条数一样，上下两行因此对得齐，
+   不会像 wrap 那样一行长一行短。padding-left 对齐到档名，不缩在三角底下。
+   .tp 撑满格子、分数贴到每格右边——主题左对齐，分数也成一列。 */
+.taste-group .items{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:3px 26px;padding:2px 0 12px 13px}
 .taste{display:flex;align-items:baseline;gap:6px;padding:2px 0;min-width:0}
-.taste .tp{font-family:var(--serif);font-size:13px;color:var(--ink);white-space:nowrap;
-           overflow:hidden;text-overflow:ellipsis;max-width:13em}
+.taste .tp{flex:1;min-width:0;font-family:var(--serif);font-size:13px;color:var(--ink);
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .taste .sc{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;flex:none}
 .taste.up .sc{color:var(--live)}
 .taste.down .sc{color:var(--dull)}
@@ -249,6 +271,7 @@ summary.reads-head:hover{color:var(--ink-2)}
   .chat{max-width:34rem}
   .msgs{max-height:46vh}
   .log{--w:none;padding:24px 24px 44px}
+  .taste-group .items{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @media (max-width:640px){
   .masthead{padding:13px 16px 11px}
@@ -265,6 +288,7 @@ summary.reads-head:hover{color:var(--ink-2)}
   .vid .vote{width:100%;justify-content:flex-start;margin-top:4px}
   .verdict{margin-left:0}
   .pair{grid-template-columns:1fr;gap:18px}
+  .taste-group .items{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -304,7 +328,7 @@ summary.reads-head:hover{color:var(--ink-2)}
   <section class="taste-band" aria-label="他的口味">
     <h2>他的口味<span class="n" id="taste-count"></span></h2>
     <div class="taste-strip" id="taste"><p class="empty">还没形成。</p></div>
-    <p class="legend" id="taste-legend">分数青的是想多看，茜的是腻了。鼠标停在一条上，能看他为什么这么打分。</p>
+    <p class="legend" id="taste-legend">按分数收成三档：青的是想多看，灰的是说不上，茜的是腻了。点开一档看里面的主题；鼠标停在一条上，能看他为什么这么打分。</p>
   </section>
 
   <section class="log" aria-label="冲浪日志">
@@ -577,20 +601,41 @@ function markCut(box) {
 $("#msgs").addEventListener("scroll", e => markCut(e.currentTarget), {passive: true});
 
 /* ============================================================ 口味 */
+/* 哪几档是摊开的，记在这儿。整个口味区每 5 秒跟着 /api/state 重画一次，
+   不记的话点开的那一秒就自己合上了（日志里的 opened 是同一个道理）。 */
+const tiersOpen = new Set();
+
 function renderTaste(rows) {
   const box = $("#taste"), n = $("#taste-count");
   box.replaceChildren();
   n.textContent = rows.length ? `${rows.length} 个主题` : "";
   $("#taste-legend").hidden = !rows.length;   // 没有主题就别解释怎么看主题
   if (!rows.length) { box.append(el("p", "empty", "还没形成。等他出门回来就有了。")); return; }
-  // 一到一名顺着分数排下去，横向读就是他的口味谱。理由塞不下，挂 title 上。
-  // 不截断：标题写着「17 个主题」却只摆 12 条，是明着骗人
-  rows.forEach(r => {
-    const cls = r.score >= 1 ? "up" : r.score < .45 ? "down" : "";
-    const s = el("span", "taste " + cls);
-    s.append(el("span", "tp", r.topic), el("span", "sc num", r.score.toFixed(2)));
-    if (r.reason) s.title = `${r.topic} ${r.score.toFixed(2)}——${r.reason}`;
-    box.append(s);
+  // 三档：青=想多看（≥1）、灰=说不上、茜=腻了（<0.45）。分档线和颜色同旧版一字不差。
+  // 三档默认都合着；空档不摆，免得点开是个空盒子。不截断——标题写着「24 个主题」
+  // 却只摆得出 12 条是明着骗人，所以三档条数加起来必须等于那个数。
+  [["up", "想多看", r => r.score >= 1],
+   ["mid", "说不上", r => r.score >= .45 && r.score < 1],
+   ["down", "腻了", r => r.score < .45]].forEach(([cls, label, hit]) => {
+    const group = rows.filter(hit);
+    if (!group.length) return;
+    const d = document.createElement("details");
+    d.className = "taste-group " + cls;
+    d.open = tiersOpen.has(cls);          // 重画时把之前摊开的那档接着摊开
+    d.addEventListener("toggle", () => d.open ? tiersOpen.add(cls) : tiersOpen.delete(cls));
+    const head = document.createElement("summary");
+    head.append(el("span", "gl", label), el("span", "gn", `${group.length} 个`));
+    d.append(head);
+    const items = el("div", "items");
+    // rows 是后端按分数降序给的，filter 保序——每档内部自然就是从高到低
+    group.forEach(r => {
+      const s = el("span", cls === "mid" ? "taste" : "taste " + cls);
+      s.append(el("span", "tp", r.topic), el("span", "sc num", r.score.toFixed(2)));
+      if (r.reason) s.title = `${r.topic} ${r.score.toFixed(2)}——${r.reason}`;
+      items.append(s);
+    });
+    d.append(items);
+    box.append(d);
   });
 }
 
