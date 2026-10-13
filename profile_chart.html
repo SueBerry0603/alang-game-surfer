@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>阿浪 · 兴趣画像分数变化</title>
+<style>
+:root{color-scheme:light}
+.viz-root{
+  --surface-1:#fcfcfb; --page:#f9f9f7;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --series-1:#2a78d6; --series-2:#eb6834; --series-3:#1baf7a; --series-8:#e34948;
+  --ctx-op:.42; --wash:.10;
+  color-scheme:light;
+  background:var(--page); color:var(--text-primary);
+  font:14px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:28px 22px 56px; min-height:100vh; box-sizing:border-box;
+}
+@media (prefers-color-scheme:dark){
+  :root:where(:not([data-theme="light"])) .viz-root{
+    --surface-1:#1a1a19; --page:#0d0d0d;
+    --text-primary:#f0efec; --text-secondary:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-8:#e66767;
+    --ctx-op:.34; --wash:.14; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"] .viz-root{
+  --surface-1:#1a1a19; --page:#0d0d0d;
+  --text-primary:#f0efec; --text-secondary:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+  --series-1:#3987e5; --series-2:#d95926; --series-3:#199e70; --series-8:#e66767;
+  --ctx-op:.34; --wash:.14; color-scheme:dark;
+}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:20px;font-weight:600;margin:0 0 6px}
+.sub{color:var(--text-secondary);margin:0 0 4px;font-size:13px}
+.warn{color:var(--text-secondary);font-size:12.5px;border-left:2px solid var(--series-8);
+      padding:2px 0 2px 10px;margin:14px 0 0;max-width:74ch}
+.bar{display:flex;gap:8px;justify-content:flex-end;margin:16px 0 0}
+button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface-1);color:var(--text-secondary)}
+button:hover{color:var(--text-primary)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px;margin:22px 0 26px}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.tile .lab{font-size:12px;color:var(--text-secondary);margin-bottom:3px}
+.tile .val{font-size:23px;font-weight:600;letter-spacing:-.01em}
+.tile .note{font-size:11.5px;color:var(--muted);margin-top:2px}
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:12px;
+  padding:18px 18px 14px;margin-bottom:16px}
+.card h2{font-size:14.5px;font-weight:600;margin:0 0 3px}
+.card .cap{font-size:12.5px;color:var(--text-secondary);margin:0 0 12px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 8px;font-size:12.5px;color:var(--text-secondary)}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:22px;height:0;border-top-width:2px;border-top-style:solid;border-radius:2px}
+.sw.dot{width:9px;height:9px;border-radius:50%;border:0}
+.dash{border-top-style:dashed!important}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.gridline{stroke:var(--grid);stroke-width:1;shape-rendering:crispEdges}
+.axisline{stroke:var(--axis);stroke-width:1;shape-rendering:crispEdges}
+.tk{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.dlab{fill:var(--text-secondary);font-size:11.5px;font-variant-numeric:tabular-nums}
+.vlab{fill:var(--text-primary);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.lead{stroke:var(--muted);stroke-width:1}
+.tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;z-index:9;
+  background:var(--surface-1);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.14);max-width:320px}
+.tip .v{font-weight:600;font-variant-numeric:tabular-nums}
+.tip .k{color:var(--text-secondary);font-size:11.5px}
+.tip .row{display:flex;align-items:baseline;gap:7px;margin-top:3px}
+.tip .ln{width:14px;border-top-width:2px;border-top-style:solid;flex:none;align-self:center}
+.tip .t{color:var(--text-secondary);font-size:11.5px;margin-bottom:4px;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:5px 9px;border-bottom:1px solid var(--border);
+  font-variant-numeric:tabular-nums}
+th{color:var(--text-secondary);font-weight:500;position:sticky;top:0;background:var(--surface-1)}
+tbody tr:hover{background:var(--page)}
+.scroll{max-height:460px;overflow:auto;margin-top:8px}
+.rel{color:var(--text-secondary)}
+.foot{color:var(--muted);font-size:11.5px;margin-top:6px}
+@media (max-width:720px){.cols{grid-template-columns:1fr!important}}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+</style></head><body>
+<div class="viz-root"><div class="wrap">
+
+<h1>阿浪 · 兴趣画像分数变化</h1>
+<p class="sub">数据窗口 10-08 16:50 → 10-11 13:52（约 69 小时）。分数区间 0–2，累加制。</p>
+<p class="sub">轨迹不是记录，是<b>重放</b>：库里只存当前值，历史唯一证据是每轮日记里的改分流水。</p>
+<p class="warn">重放能把 63 / 64 条主题的当前分数一分不差地还原出来。剩下 1 条差 0.80——那一跳只出现在对话里，没有进流水。下图单独标出。</p>
+
+<div class="bar">
+  <button id="tbl-btn" aria-pressed="false">表格视图</button>
+  <button id="thm-btn">切换明暗</button>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="card">
+  <h2>一、分数轨迹</h2>
+  <p class="cap" id="capA"></p>
+  <div class="legend" id="legA"></div>
+  <svg id="svgA" viewBox="0 0 900 392" role="img"
+       aria-label="64 条主题的分数随时间变化，其中 3 条高亮"></svg>
+</div>
+
+<div class="cols">
+  <div class="card">
+    <h2>二、每天的改分额</h2>
+    <p class="cap">同一天里所有加分、减分的绝对值合计。</p>
+    <div class="legend" id="legB"></div>
+    <svg id="svgB" viewBox="0 0 440 268" role="img" aria-label="每日加分与减分合计"></svg>
+  </div>
+  <div class="card">
+    <h2>三、每天新增的主题</h2>
+    <p class="cap">当天第一次出现在改分流水里的主题数，不含 7 条种子。</p>
+    <svg id="svgC" viewBox="0 0 440 268" role="img" aria-label="每日新增主题数"></svg>
+  </div>
+</div>
+
+<div class="card" id="cardT" hidden>
+  <h2>表格视图 · 全部改分流水</h2>
+  <p class="cap">图中每条轨迹的原始点，一行一次改动。</p>
+  <div class="scroll"><table id="tblE"></table></div>
+  <h2 style="margin-top:20px">表格视图 · 与库内当前值对账</h2>
+  <p class="cap">残差 = 库里当前分数 − 流水重放分数。非零即表示存在未留档的改动。</p>
+  <div class="scroll"><table id="tblR"></table></div>
+</div>
+
+<p class="foot" id="foot"></p>
+</div></div>
+<div class="tip" id="tip" role="status"></div>
+
+<script>
+const D = {"series":[{"topic":"关卡设计拆解","role":"high","n":11,"pts":[[1791449580,0.8,0.3,1],[1791450833,0.9,0.1,1],[1791453421,1.05,0.15,1],[1791453726,1.1500000000000001,0.1,1],[1791453992,1.2500000000000002,0.1,1],[1791454114,1.3000000000000003,0.05,1],[1791454432,1.4500000000000002,0.15,1],[1791525449,1.6,0.15,1],[1791528356,1.7000000000000002,0.1,1],[1791602060,1.8000000000000003,0.1,1],[1791697861,1.9500000000000002,0.15,1]],"current":1.95},{"topic":"机制设计/博弈论（激励相容·拍卖·信息不对称）","role":"ctx","n":2,"pts":[[1791533389,1.3,0.8,1],[1791697861,1.4000000000000001,0.1,1]],"current":1.4},{"topic":"桌游棋牌","role":"busy","n":13,"pts":[[1791449409,0.6,0.0,1],[1791449473,0.8,0.2,1],[1791449580,0.9,0.1,1],[1791450833,0.9500000000000001,0.05,1],[1791453421,1.05,0.1,1],[1791453726,1.2,0.15,1],[1791454114,1.3,0.1,1],[1791454778,1.4000000000000001,0.1,1],[1791521475,1.5000000000000002,0.1,1],[1791522086,1.6000000000000003,0.1,1],[1791525449,1.5000000000000002,-0.1,1],[1791525739,1.4000000000000001,-0.1,1],[1791528356,1.2500000000000002,-0.15,1]],"current":1.25},{"topic":"小丑牌 Balatro","role":"unlogged","n":5,"pts":[[1791450385,1.3,0.8,0],[1791453992,1.2,-0.1,1],[1791522086,1.3499999999999999,0.15,1],[1791525449,1.2499999999999998,-0.1,1],[1791697861,1.1499999999999997,-0.1,1]],"current":1.15},{"topic":"小丑牌 Balatro 手感与反馈拆解","role":"ctx","n":1,"pts":[[1791533389,1.1,0.6,1]],"current":1.1},{"topic":"桌游数学模型与动作经济","role":"ctx","n":1,"pts":[[1791533389,1.1,0.6,1]],"current":1.1},{"topic":"音游","role":"ctx","n":8,"pts":[[1791449409,0.6,0.0,1],[1791449473,0.8999999999999999,0.3,1],[1791453992,0.9999999999999999,0.1,1],[1791454114,1.15,0.15,1],[1791454778,1.0499999999999998,-0.1,1],[1791521475,1.0999999999999999,0.05,1],[1791525449,1.2499999999999998,0.15,1],[1791525739,1.0999999999999999,-0.15,1]],"current":1.1},{"topic":"游戏","role":"ctx","n":1,"pts":[[1791449409,1.0,0.0,1]],"current":1.0},{"topic":"游戏叙事深度分析","role":"ctx","n":4,"pts":[[1791449580,0.75,0.25,1],[1791450833,0.8,0.05,1],[1791453421,0.8500000000000001,0.05,1],[1791453992,0.9500000000000001,0.1,1]],"current":0.95},{"topic":"独立游戏","role":"ctx","n":3,"pts":[[1791449473,0.9,0.4,1],[1791450833,0.85,-0.05,1],[1791454114,0.9,0.05,1]],"current":0.9},{"topic":"回合制系统设计","role":"ctx","n":2,"pts":[[1791454432,0.75,0.25,1],[1791522086,0.9,0.15,1]],"current":0.9},{"topic":"卡组构筑DBG","role":"ctx","n":1,"pts":[[1791523938,0.9,0.4,1]],"current":0.9},{"topic":"回合顺序与行动经济","role":"ctx","n":1,"pts":[[1791533514,0.85,0.35,1]],"current":0.85},{"topic":"难度量化/多维难度评估","role":"ctx","n":1,"pts":[[1791627935,0.85,0.35,1]],"current":0.85},{"topic":"自制桌游锐评","role":"ctx","n":1,"pts":[[1791523938,0.8,0.3,1]],"current":0.8},{"topic":"机制边界与分类","role":"ctx","n":1,"pts":[[1791525449,0.8,0.3,1]],"current":0.8},{"topic":"拍卖定价与信息账（现代艺术）","role":"ctx","n":1,"pts":[[1791627935,0.8,0.3,1]],"current":0.8},{"topic":"小丑牌机制与结算曲线拆解","role":"ctx","n":1,"pts":[[1791630128,0.8,0.3,1]],"current":0.8},{"topic":"贝叶斯博弈/信号博弈","role":"ctx","n":1,"pts":[[1791697558,0.8,0.3,1]],"current":0.8},{"topic":"先后手与回合顺序的平衡设计","role":"ctx","n":1,"pts":[[1791528014,0.75,0.25,1]],"current":0.75},{"topic":"自走棋/自动战斗的经济系统","role":"ctx","n":1,"pts":[[1791602060,0.75,0.25,1]],"current":0.75},{"topic":"关卡白盒 / demo 级逐段拆解","role":"ctx","n":1,"pts":[[1791627792,0.75,0.25,1]],"current":0.75},{"topic":"拍卖实战复盘（虚张声势·掩盖意图·套利节奏）","role":"ctx","n":1,"pts":[[1791697320,0.75,0.25,1]],"current":0.75},{"topic":"现代艺术实战复盘","role":"ctx","n":1,"pts":[[1791697558,0.75,0.25,1]],"current":0.75},{"topic":"拍卖与信号博弈（一美元拍卖·全支付·赢家诅咒·声誉）","role":"ctx","n":1,"pts":[[1791697704,0.75,0.25,1]],"current":0.75},{"topic":"单机游戏","role":"ctx","n":2,"pts":[[1791449409,0.6,0.0,1],[1791449580,0.7,0.1,1]],"current":0.7},{"topic":"网络游戏","role":"ctx","n":2,"pts":[[1791449409,0.6,0.0,1],[1791449473,0.7,0.1,1]],"current":0.7},{"topic":"沉浸式模拟","role":"ctx","n":1,"pts":[[1791454432,0.7,0.2,1]],"current":0.7},{"topic":"桌游机制划界（这算不算那个机制）","role":"ctx","n":1,"pts":[[1791528014,0.7,0.2,1]],"current":0.7},{"topic":"AI自动制谱/算法生成关卡","role":"ctx","n":1,"pts":[[1791602060,0.7,0.2,1]],"current":0.7},{"topic":"不完全信息博弈建模（策略树/贝叶斯）","role":"ctx","n":1,"pts":[[1791630128,0.7,0.2,1]],"current":0.7},{"topic":"难度量化/定数","role":"ctx","n":1,"pts":[[1791697558,0.7,0.2,1]],"current":0.7},{"topic":"实机关卡引导拆解","role":"ctx","n":1,"pts":[[1791697558,0.7,0.2,1]],"current":0.7},{"topic":"程序化关卡","role":"ctx","n":1,"pts":[[1791454432,0.65,0.15,1]],"current":0.65},{"topic":"关卡引导与空间叙事","role":"ctx","n":1,"pts":[[1791525739,0.65,0.15,1]],"current":0.65},{"topic":"机制数学与非传递性","role":"ctx","n":1,"pts":[[1791525739,0.65,0.15,1]],"current":0.65},{"topic":"箱庭·空间引导（无UI沟通）","role":"ctx","n":1,"pts":[[1791528014,0.65,0.15,1]],"current":0.65},{"topic":"具体平衡手段（破平/补偿/费用曲线）","role":"ctx","n":1,"pts":[[1791529321,0.65,0.15,1]],"current":0.65},{"topic":"音游谱面难度量化（定数·密度·KPS·采样窗口）","role":"ctx","n":1,"pts":[[1791697320,0.65,0.15,1]],"current":0.65},{"topic":"音游判定方案与难度量化","role":"ctx","n":1,"pts":[[1791698015,0.65,0.15,1]],"current":0.65},{"topic":"无UI引导/空间沟通","role":"ctx","n":1,"pts":[[1791529321,0.6,0.1,1]],"current":0.6},{"topic":"拍卖机制分类（一口价/秘密出价/轮流出价/拍卖补偿）","role":"ctx","n":1,"pts":[[1791698015,0.6,0.1,1]],"current":0.6},{"topic":"游戏策划求职/入门课程","role":"ctx","n":1,"pts":[[1791453726,0.4,-0.1,1]],"current":0.4},{"topic":"音游比赛录像 手元","role":"ctx","n":1,"pts":[[1791521475,0.35,-0.15,1]],"current":0.35},{"topic":"竞技平衡杂谈（绝对平衡之类）","role":"ctx","n":1,"pts":[[1791528014,0.35,-0.15,1]],"current":0.35},{"topic":"电子竞技","role":"ctx","n":2,"pts":[[1791449409,0.6,0.0,1],[1791449473,0.3,-0.3,1]],"current":0.3},{"topic":"手机游戏","role":"ctx","n":2,"pts":[[1791449409,0.6,0.0,1],[1791449473,0.3,-0.3,1]],"current":0.3},{"topic":"行动编程","role":"ctx","n":1,"pts":[[1791523938,0.3,-0.2,1]],"current":0.3},{"topic":"非传递性 数学科普","role":"ctx","n":1,"pts":[[1791529321,0.3,-0.2,1]],"current":0.3},{"topic":"关卡白盒作品展示/求职demo","role":"ctx","n":1,"pts":[[1791627935,0.3,-0.2,1]],"current":0.3},{"topic":"泛泛机制盘点与分类科普","role":"ctx","n":1,"pts":[[1791627935,0.3,-0.2,1]],"current":0.3},{"topic":"纯理论博弈论公开课（信号博弈/均衡推导）","role":"ctx","n":1,"pts":[[1791697320,0.3,-0.2,1]],"current":0.3},{"topic":"怀旧网游传奇类","role":"ctx","n":1,"pts":[[1791449580,0.25,-0.25,1]],"current":0.25},{"topic":"音游手元/自制谱演示","role":"ctx","n":1,"pts":[[1791454432,0.25,-0.25,1]],"current":0.25},{"topic":"翻译搬运的重复内容","role":"ctx","n":1,"pts":[[1791529321,0.25,-0.25,1]],"current":0.25},{"topic":"《现代艺术·华夏》开箱测评","role":"ctx","n":1,"pts":[[1791698015,0.25,-0.25,1]],"current":0.25},{"topic":"一分钟讲清博弈论的短视频","role":"ctx","n":1,"pts":[[1791533514,0.2,-0.3,1]],"current":0.2},{"topic":"关卡节奏（分类科普向）","role":"ctx","n":1,"pts":[[1791627792,0.2,-0.3,1]],"current":0.2},{"topic":"桌游开箱评测 / 机制盘点推荐","role":"ctx","n":1,"pts":[[1791627792,0.2,-0.3,1]],"current":0.2},{"topic":"关卡白盒复刻（求职练习向）","role":"ctx","n":1,"pts":[[1791630128,0.2,-0.3,1]],"current":0.2},{"topic":"白盒关卡作品集/招生课","role":"ctx","n":1,"pts":[[1791697704,0.2,-0.3,1]],"current":0.2},{"topic":"求职向关卡白盒建模展示（个人建模+UE预览）","role":"ctx","n":1,"pts":[[1791697320,0.15000000000000002,-0.35,1]],"current":0.15},{"topic":"关卡白盒/求职作品集式拆解","role":"ctx","n":1,"pts":[[1791697558,0.15000000000000002,-0.35,1]],"current":0.15},{"topic":"音游定数排行榜/难度雷达图","role":"ctx","n":1,"pts":[[1791630128,0.09999999999999998,-0.4,1]],"current":0.1}],"stats":{"topics":64,"events":100,"seed":7,"up":69,"down":31,"once":52,"abs_total":20.05,"net":6.95,"unlogged":0.8,"t0":1791449409,"t1":1791698015},"days":[{"d":"10-08","up":4.8,"down":1.45,"new":10},{"d":"10-09","up":5.45,"down":1.85,"new":20},{"d":"10-10","up":1.95,"down":1.7,"new":13},{"d":"10-11","up":2.1,"down":1.55,"new":14}]}, RECON = [{"topic":"关卡设计拆解","current":1.95,"replayed":1.95,"residual":-0.0,"n":11,"role":"high"},{"topic":"机制设计/博弈论（激励相容·拍卖·信息不对称）","current":1.4,"replayed":1.4,"residual":-0.0,"n":2,"role":"ctx"},{"topic":"桌游棋牌","current":1.25,"replayed":1.25,"residual":-0.0,"n":13,"role":"busy"},{"topic":"小丑牌 Balatro","current":1.15,"replayed":0.35,"residual":0.8,"n":5,"role":"unlogged"},{"topic":"小丑牌 Balatro 手感与反馈拆解","current":1.1,"replayed":1.1,"residual":0.0,"n":1,"role":"ctx"},{"topic":"桌游数学模型与动作经济","current":1.1,"replayed":1.1,"residual":0.0,"n":1,"role":"ctx"},{"topic":"音游","current":1.1,"replayed":1.1,"residual":0.0,"n":8,"role":"ctx"},{"topic":"游戏","current":1.0,"replayed":1.0,"residual":0.0,"n":1,"role":"ctx"},{"topic":"游戏叙事深度分析","current":0.95,"replayed":0.95,"residual":-0.0,"n":4,"role":"ctx"},{"topic":"独立游戏","current":0.9,"replayed":0.9,"residual":0.0,"n":3,"role":"ctx"},{"topic":"回合制系统设计","current":0.9,"replayed":0.9,"residual":0.0,"n":2,"role":"ctx"},{"topic":"卡组构筑DBG","current":0.9,"replayed":0.9,"residual":0.0,"n":1,"role":"ctx"},{"topic":"回合顺序与行动经济","current":0.85,"replayed":0.85,"residual":0.0,"n":1,"role":"ctx"},{"topic":"难度量化/多维难度评估","current":0.85,"replayed":0.85,"residual":0.0,"n":1,"role":"ctx"},{"topic":"自制桌游锐评","current":0.8,"replayed":0.8,"residual":0.0,"n":1,"role":"ctx"},{"topic":"机制边界与分类","current":0.8,"replayed":0.8,"residual":0.0,"n":1,"role":"ctx"},{"topic":"拍卖定价与信息账（现代艺术）","current":0.8,"replayed":0.8,"residual":0.0,"n":1,"role":"ctx"},{"topic":"小丑牌机制与结算曲线拆解","current":0.8,"replayed":0.8,"residual":0.0,"n":1,"role":"ctx"},{"topic":"贝叶斯博弈/信号博弈","current":0.8,"replayed":0.8,"residual":0.0,"n":1,"role":"ctx"},{"topic":"先后手与回合顺序的平衡设计","current":0.75,"replayed":0.75,"residual":0.0,"n":1,"role":"ctx"},{"topic":"自走棋/自动战斗的经济系统","current":0.75,"replayed":0.75,"residual":0.0,"n":1,"role":"ctx"},{"topic":"关卡白盒 / demo 级逐段拆解","current":0.75,"replayed":0.75,"residual":0.0,"n":1,"role":"ctx"},{"topic":"拍卖实战复盘（虚张声势·掩盖意图·套利节奏）","current":0.75,"replayed":0.75,"residual":0.0,"n":1,"role":"ctx"},{"topic":"现代艺术实战复盘","current":0.75,"replayed":0.75,"residual":0.0,"n":1,"role":"ctx"},{"topic":"拍卖与信号博弈（一美元拍卖·全支付·赢家诅咒·声誉）","current":0.75,"replayed":0.75,"residual":0.0,"n":1,"role":"ctx"},{"topic":"单机游戏","current":0.7,"replayed":0.7,"residual":0.0,"n":2,"role":"ctx"},{"topic":"网络游戏","current":0.7,"replayed":0.7,"residual":0.0,"n":2,"role":"ctx"},{"topic":"沉浸式模拟","current":0.7,"replayed":0.7,"residual":0.0,"n":1,"role":"ctx"},{"topic":"桌游机制划界（这算不算那个机制）","current":0.7,"replayed":0.7,"residual":0.0,"n":1,"role":"ctx"},{"topic":"AI自动制谱/算法生成关卡","current":0.7,"replayed":0.7,"residual":0.0,"n":1,"role":"ctx"},{"topic":"不完全信息博弈建模（策略树/贝叶斯）","current":0.7,"replayed":0.7,"residual":0.0,"n":1,"role":"ctx"},{"topic":"难度量化/定数","current":0.7,"replayed":0.7,"residual":0.0,"n":1,"role":"ctx"},{"topic":"实机关卡引导拆解","current":0.7,"replayed":0.7,"residual":0.0,"n":1,"role":"ctx"},{"topic":"程序化关卡","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"关卡引导与空间叙事","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"机制数学与非传递性","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"箱庭·空间引导（无UI沟通）","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"具体平衡手段（破平/补偿/费用曲线）","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"音游谱面难度量化（定数·密度·KPS·采样窗口）","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"音游判定方案与难度量化","current":0.65,"replayed":0.65,"residual":0.0,"n":1,"role":"ctx"},{"topic":"无UI引导/空间沟通","current":0.6,"replayed":0.6,"residual":0.0,"n":1,"role":"ctx"},{"topic":"拍卖机制分类（一口价/秘密出价/轮流出价/拍卖补偿）","current":0.6,"replayed":0.6,"residual":0.0,"n":1,"role":"ctx"},{"topic":"游戏策划求职/入门课程","current":0.4,"replayed":0.4,"residual":0.0,"n":1,"role":"ctx"},{"topic":"音游比赛录像 手元","current":0.35,"replayed":0.35,"residual":0.0,"n":1,"role":"ctx"},{"topic":"竞技平衡杂谈（绝对平衡之类）","current":0.35,"replayed":0.35,"residual":0.0,"n":1,"role":"ctx"},{"topic":"电子竞技","current":0.3,"replayed":0.3,"residual":0.0,"n":2,"role":"ctx"},{"topic":"手机游戏","current":0.3,"replayed":0.3,"residual":0.0,"n":2,"role":"ctx"},{"topic":"行动编程","current":0.3,"replayed":0.3,"residual":0.0,"n":1,"role":"ctx"},{"topic":"非传递性 数学科普","current":0.3,"replayed":0.3,"residual":0.0,"n":1,"role":"ctx"},{"topic":"关卡白盒作品展示/求职demo","current":0.3,"replayed":0.3,"residual":0.0,"n":1,"role":"ctx"},{"topic":"泛泛机制盘点与分类科普","current":0.3,"replayed":0.3,"residual":0.0,"n":1,"role":"ctx"},{"topic":"纯理论博弈论公开课（信号博弈/均衡推导）","current":0.3,"replayed":0.3,"residual":0.0,"n":1,"role":"ctx"},{"topic":"怀旧网游传奇类","current":0.25,"replayed":0.25,"residual":0.0,"n":1,"role":"ctx"},{"topic":"音游手元/自制谱演示","current":0.25,"replayed":0.25,"residual":0.0,"n":1,"role":"ctx"},{"topic":"翻译搬运的重复内容","current":0.25,"replayed":0.25,"residual":0.0,"n":1,"role":"ctx"},{"topic":"《现代艺术·华夏》开箱测评","current":0.25,"replayed":0.25,"residual":0.0,"n":1,"role":"ctx"},{"topic":"一分钟讲清博弈论的短视频","current":0.2,"replayed":0.2,"residual":0.0,"n":1,"role":"ctx"},{"topic":"关卡节奏（分类科普向）","current":0.2,"replayed":0.2,"residual":0.0,"n":1,"role":"ctx"},{"topic":"桌游开箱评测 / 机制盘点推荐","current":0.2,"replayed":0.2,"residual":0.0,"n":1,"role":"ctx"},{"topic":"关卡白盒复刻（求职练习向）","current":0.2,"replayed":0.2,"residual":0.0,"n":1,"role":"ctx"},{"topic":"白盒关卡作品集/招生课","current":0.2,"replayed":0.2,"residual":0.0,"n":1,"role":"ctx"},{"topic":"求职向关卡白盒建模展示（个人建模+UE预览）","current":0.15,"replayed":0.15,"residual":-0.0,"n":1,"role":"ctx"},{"topic":"关卡白盒/求职作品集式拆解","current":0.15,"replayed":0.15,"residual":-0.0,"n":1,"role":"ctx"},{"topic":"音游定数排行榜/难度雷达图","current":0.1,"replayed":0.1,"residual":0.0,"n":1,"role":"ctx"}];
+const DAYS = D.days;
+const SVGNS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+const cssv = n => getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(n).trim();
+
+function mk(tag, attrs, parent){
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, x, y, s, cls, anchor){
+  const t = mk("text", {x, y, class: cls, "text-anchor": anchor || "start"}, parent);
+  t.textContent = s;                       // 标签一律走 textContent
+  return t;
+}
+const fmtTime = ts => {
+  const d = new Date(ts * 1000), p = n => String(n).padStart(2, "0");
+  return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+const dayOf = ts => { const d = new Date(ts*1000), p = n => String(n).padStart(2,"0");
+                      return `${p(d.getMonth()+1)}-${p(d.getDate())}`; };
+
+// ------------------------------------------------------------------ KPI
+const kpis = [
+  ["主题条目", D.stats.topics, "其中只被改过一次的 52 条"],
+  ["留档改分", D.stats.events + " 次", `加分 ${D.stats.up} · 减分 ${D.stats.down}`],
+  ["净变化", (D.stats.net>=0?"+":"") + D.stats.net.toFixed(2), "合计后的漂移方向"],
+  ["总变动量", D.stats.abs_total.toFixed(2), "加分减分绝对值之和"],
+  ["未留档", "+" + D.stats.unlogged.toFixed(2), "只发生在对话里"],
+];
+$("kpis").innerHTML = "";
+for (const [lab, val, note] of kpis){
+  const d = document.createElement("div"); d.className = "tile";
+  const a = document.createElement("div"); a.className = "lab"; a.textContent = lab;
+  const b = document.createElement("div"); b.className = "val"; b.textContent = String(val);
+  const c = document.createElement("div"); c.className = "note"; c.textContent = note;
+  d.append(a, b, c); $("kpis").appendChild(d);
+}
+
+// ------------------------------------------------------------------ 图一
+const A = {x0:56, x1:742, y0:18, y1:332}, T0 = D.stats.t0, T1 = D.stats.t1;
+const sxA = t => A.x0 + (t - T0) / (T1 - T0) * (A.x1 - A.x0);
+const syA = v => A.y1 - v / 2 * (A.y1 - A.y0);
+
+const COL = {high: "var(--series-1)", busy: "var(--series-2)", unlogged: "var(--series-3)"};
+$("capA").textContent =
+  `64 条主题。${D.stats.topics - 7} 条非种子主题里有 52 条只被改过一次，在图上就是一个孤点；` +
+  `只有 6 条有 3 个以上的点，连成线。高亮三条：分最高的、被改最勤的、以及那条有未留档改动的。`;
+const legA = $("legA");
+const legRows = [
+  ["dot", "var(--muted)", "其余 61 条主题（点＝只改过一次）", "ctx"],
+  ["line", COL.high, "关卡设计拆解 · 当前 1.95（最高）", "high"],
+  ["line", COL.busy, "桌游棋牌 · 被改 13 次（最勤）", "busy"],
+  ["line", COL.unlogged, "小丑牌 Balatro · 含未留档 +0.80", "unlogged"],
+];
+for (const [shape, color, label, cls] of legRows){
+  const s = document.createElement("span");
+  const sw = document.createElement("i");
+  sw.className = "sw" + (shape === "dot" ? " dot" : "") + (cls === "unlogged" ? " dash" : "");
+  sw.style.borderTopColor = color; if (shape === "dot") sw.style.background = color;
+  const t = document.createElement("span"); t.textContent = label;
+  s.append(sw, t); legA.appendChild(s);
+}
+
+const svgA = $("svgA");
+for (let v = 0; v <= 2.0001; v += 0.5){                       // 网格 + y 轴
+  mk("line", {x1: A.x0, y1: syA(v), x2: A.x1, y2: syA(v), class: "gridline"}, svgA);
+  txt(svgA, A.x0 - 9, syA(v) + 4, v.toFixed(1), "tk", "end");
+}
+mk("line", {x1: A.x0, y1: A.y0, x2: A.x0, y2: A.y1, class: "axisline"}, svgA);
+
+// x 轴刻度要按「本地零点」走。T0 不在整点上，所以不能按 3600 秒递推。
+for (let t = Math.ceil(T0 / 86400) * 86400; t <= T1; t += 86400){
+  mk("line", {x1: sxA(t), y1: A.y1, x2: sxA(t), y2: A.y1 + 5, class: "axisline"}, svgA);
+  txt(svgA, sxA(t), A.y1 + 20, dayOf(t), "tk", "middle");
+}
+txt(svgA, A.x0, A.y1 + 20, "10-08 16:50 起点", "tk");
+mk("line", {x1: A.x0, y1: A.y1, x2: A.x1, y2: A.y1, class: "axisline"}, svgA);
+
+function stepPath(pts, dashFrom){                              // 分数只在改动的那一刻跳
+  let d = `M${sxA(pts[0][0]).toFixed(1)},${syA(pts[0][1]).toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++){
+    const x = sxA(pts[i][0]).toFixed(1), y = syA(pts[i][1]).toFixed(1);
+    d += `H${x}V${y}`;
+  }
+  return d;
+}
+// 先画底色：61 条
+const gctx = mk("g", {}, svgA);
+for (const s of D.series.filter(s => s.role === "ctx")){
+  if (s.pts.length === 1){
+    mk("circle", {cx: sxA(s.pts[0][0]), cy: syA(s.pts[0][1]), r: 3.6,
+                  fill: "var(--muted)", "fill-opacity": "var(--ctx-op)",
+                  stroke: "var(--surface-1)", "stroke-width": 2}, gctx);
+  } else {
+    mk("path", {d: stepPath(s.pts), fill: "none", stroke: "var(--muted)",
+                "stroke-opacity": "var(--ctx-op)", "stroke-width": 1.5,
+                "stroke-linejoin": "round"}, gctx);
+  }
+}
+// 再画三条高亮
+const ghi = mk("g", {}, svgA);
+for (const s of D.series.filter(s => s.role !== "ctx")){
+  const c = COL[s.role];
+  if (s.role === "unlogged"){                                  // 从 0.5 起算的那一跳，虚线
+    const p0 = s.pts[0];
+    mk("line", {x1: sxA(p0[0]), y1: syA(0.5), x2: sxA(p0[0]), y2: syA(p0[1]),
+                stroke: c, "stroke-width": 2, "stroke-dasharray": "4 3"}, ghi);
+    mk("circle", {cx: sxA(p0[0]), cy: syA(0.5), r: 3.5, fill: "none", stroke: c,
+                  "stroke-width": 1.5, "stroke-dasharray": "3 2"}, ghi);
+  }
+  mk("path", {d: stepPath(s.pts), fill: "none", stroke: c, "stroke-width": 2,
+              "stroke-linejoin": "round", "stroke-linecap": "round"}, ghi);
+  const p = s.pts[s.pts.length - 1];
+  mk("circle", {cx: sxA(p[0]), cy: syA(p[1]), r: 4.5, fill: c,
+                stroke: "var(--surface-1)", "stroke-width": 2}, ghi);
+}
+// 端点直标：先排位，撞了就用引线牵开
+const ends = D.series.filter(s => s.role !== "ctx")
+  .map(s => ({s, y: syA(s.pts[s.pts.length-1][1]), x: sxA(s.pts[s.pts.length-1][0])}))
+  .sort((a, b) => a.y - b.y);
+for (let i = 1; i < ends.length; i++){          // 每个直标是两行（名 + 值），按 ~30px 让位
+  if (ends[i].y - ends[i-1].y < 30) ends[i].ly = ends[i-1].y + 30;
+}
+for (const e of ends){
+  const ly = e.ly ?? e.y;
+  const anchorY = Math.max(A.y0 + 10, Math.min(A.y1 - 4, ly));
+  if (Math.abs(anchorY - e.y) > 1) mk("path", {
+    d: `M${e.x + 7},${e.y} L${A.x1 + 8},${anchorY}`, class: "lead", fill: "none"}, svgA);
+  else mk("line", {x1: e.x + 7, y1: e.y, x2: A.x1 + 4, y2: anchorY, class: "lead"}, svgA);
+  const short = e.s.role === "high" ? "关卡设计拆解" : e.s.role === "busy" ? "桌游棋牌" : "小丑牌 Balatro";
+  txt(svgA, A.x1 + 12, anchorY + 4, short, "dlab");
+  txt(svgA, A.x1 + 12, anchorY + 18, e.s.current.toFixed(2), "vlab");
+}
+// 未留档那一跳的注记：放到左上角的空白处，用引线牵回那一跳
+{
+  const s = D.series.find(x => x.role === "unlogged"), p0 = s.pts[0];
+  const jx = sxA(p0[0]), lx = jx + 30, ty = syA(1.78);
+  mk("path", {d: `M${(lx-5).toFixed(1)},${(ty+4).toFixed(1)} L${(jx+8).toFixed(1)},${(ty+4).toFixed(1)}`
+                + ` L${(jx+8).toFixed(1)},${syA(1.42).toFixed(1)}`
+                + ` L${(jx+2).toFixed(1)},${syA(1.31).toFixed(1)}`,
+              fill: "none", class: "lead"}, svgA);
+  txt(svgA, lx, ty, "未留档 +0.80", "dlab");
+  txt(svgA, lx, ty + 14, `（仅见对话，${fmtTime(p0[0])}）`, "tk");
+}
+// 十字线 + 单一提示框
+const ch = mk("line", {y1: A.y0, y2: A.y1, class: "axisline", opacity: 0}, svgA);
+const tip = $("tip");
+function showTip(ev){
+  const r = svgA.getBoundingClientRect();
+  const px = (ev.clientX - r.left) / r.width * 900;
+  const t = T0 + (px - A.x0) / (A.x1 - A.x0) * (T1 - T0);
+  ch.setAttribute("x1", px); ch.setAttribute("x2", px); ch.setAttribute("opacity", 1);
+  const rows = D.series.filter(s => s.role !== "ctx").map(s => {
+    let last = null;
+    for (const p of s.pts) if (p[0] <= t) last = p;
+    return {s, last};
+  }).filter(r => r.last);
+  const nctx = D.series.filter(s => s.role === "ctx" && s.pts[0][0] <= t).length;
+  tip.innerHTML = "";
+  const h = document.createElement("div"); h.className = "t";
+  h.textContent = fmtTime(t); tip.appendChild(h);
+  for (const {s, last} of rows){
+    const d = document.createElement("div"); d.className = "row";
+    const ln = document.createElement("i"); ln.className = "ln";
+    ln.style.borderTopColor = COL[s.role]; d.appendChild(ln);
+    const v = document.createElement("span"); v.className = "v";
+    v.textContent = last[1].toFixed(2); d.appendChild(v);
+    const k = document.createElement("span"); k.className = "k";
+    k.textContent = (s.role === "high" ? "关卡设计拆解" : s.role === "busy" ? "桌游棋牌" : "小丑牌 Balatro")
+      + (last[3] ? "" : "（未留档）");
+    d.appendChild(k); tip.appendChild(d);
+  }
+  const f = document.createElement("div"); f.className = "k";
+  f.textContent = `其余 ${nctx} 条主题此刻的分数不在此列`; tip.appendChild(f);
+  tip.style.opacity = 1;
+  tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 12) + "px";
+  tip.style.top = (ev.clientY - 10) + "px";
+}
+svgA.addEventListener("pointermove", showTip);
+svgA.addEventListener("pointerleave", () => { tip.style.opacity = 0; ch.setAttribute("opacity", 0); });
+
+// ------------------------------------------------------------------ 柱状图
+function bars(id, legId, series, ymax, ticks, unit){
+  const svg = $(id), x0 = 46, x1 = 414, y0 = 20, y1 = 196;
+  const band = (x1 - x0) / DAYS.length;
+  const sy = v => y1 - v / ymax * (y1 - y0);
+  for (const t of ticks){
+    mk("line", {x1: x0, y1: sy(t), x2: x1, y2: sy(t), class: "gridline"}, svg);
+    txt(svg, x0 - 8, sy(t) + 4, String(t), "tk", "end");
+  }
+  mk("line", {x1: x0, y1: y1, x2: x1, y2: y1, class: "axisline"}, svg);
+  const n = series.length, bw = Math.min(24, (band * 0.5 - (n - 1) * 2) / n);
+  DAYS.forEach((d, i) => {
+    const cx = x0 + band * i + band / 2;
+    series.forEach((se, k) => {
+      const v = d[se.key], w = bw, bx = cx - (n * bw + (n - 1) * 2) / 2 + k * (bw + 2);
+      if (v <= 0) return;
+      const h = y1 - sy(v), r = Math.min(4, w / 2);
+      mk("path", {d: `M${bx},${y1} V${sy(v)+r} Q${bx},${sy(v)} ${bx+r},${sy(v)} H${bx+w-r}`
+                    + ` Q${bx+w},${sy(v)} ${bx+w},${sy(v)+r} V${y1} Z`, fill: se.color}, svg);
+    });
+    txt(svg, cx, y1 + 20, d.d, "tk", "middle");
+    const hit = mk("rect", {x: x0 + band * i, y: y0, width: band, height: y1 - y0,
+                            fill: "transparent"}, svg);
+    hit.addEventListener("pointermove", ev => {
+      tip.innerHTML = "";
+      const h = document.createElement("div"); h.className = "t";
+      h.textContent = d.d; tip.appendChild(h);
+      for (const se of series){
+        const row = document.createElement("div"); row.className = "row";
+        const ln = document.createElement("i"); ln.className = "ln";
+        ln.style.borderTopColor = se.color; row.appendChild(ln);
+        const v = document.createElement("span"); v.className = "v";
+        v.textContent = (unit === "分" ? d[se.key].toFixed(2) : d[se.key]) + unit;
+        row.appendChild(v);
+        const k = document.createElement("span"); k.className = "k";
+        k.textContent = se.label; row.appendChild(k); tip.appendChild(row);
+      }
+      tip.style.opacity = 1;
+      tip.style.left = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 12) + "px";
+      tip.style.top = (ev.clientY - 10) + "px";
+    });
+    hit.addEventListener("pointerleave", () => { tip.style.opacity = 0; });
+  });
+  const leg = $(legId);
+  if (!leg) return;                       // 单序列不配图例：标题已经说明画的是什么
+  for (const se of series){
+    const s = document.createElement("span");
+    const sw = document.createElement("i"); sw.className = "sw dot"; sw.style.background = se.color;
+    const t = document.createElement("span"); t.textContent = se.label;
+    s.append(sw, t); leg.appendChild(s);
+  }
+}
+bars("svgB", "legB", [
+  {key: "up", label: "加分合计", color: "var(--series-1)"},
+  {key: "down", label: "减分合计", color: "var(--series-8)"},
+], 6, [0, 2, 4, 6], "分");
+bars("svgC", "legC", [{key: "new", label: "新增主题", color: "var(--series-1)"}],
+ 20, [0, 5, 10, 15, 20], " 个");
+
+// ------------------------------------------------------------------ 表格视图
+function buildTables(){
+  const e = $("tblE");
+  e.innerHTML = "";
+  const hr = document.createElement("tr");
+  for (const h of ["主题", "时间", "本次增量", "改动后分数", "来源"])
+    { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); }
+  e.appendChild(hr);
+  const rows = [];
+  for (const s of D.series) for (const p of s.pts) rows.push([s.topic, p[0], p[2], p[1], p[3]]);
+  rows.sort((a, b) => a[1] - b[1]);
+  for (const [topic, ts, delta, score, logged] of rows){
+    const tr = document.createElement("tr");
+    const cells = [topic, fmtTime(ts), delta ? (delta > 0 ? "+" : "") + delta.toFixed(2) : "—",
+                   score.toFixed(2), logged ? "流水" : "未留档（对话）"];
+    for (const c of cells){ const td = document.createElement("td"); td.textContent = c; tr.appendChild(td); }
+    e.appendChild(tr);
+  }
+  const r = $("tblR"); r.innerHTML = "";
+  const hr2 = document.createElement("tr");
+  for (const h of ["主题", "库里当前", "流水重放", "残差", "被改次数"])
+    { const th = document.createElement("th"); th.textContent = h; hr2.appendChild(th); }
+  r.appendChild(hr2);
+  for (const x of RECON){
+    const tr = document.createElement("tr");
+    const cells = [x.topic, x.current.toFixed(2), x.replayed.toFixed(2),
+                   (x.residual > 0 ? "+" : "") + x.residual.toFixed(2), x.n];
+    for (const c of cells){ const td = document.createElement("td"); td.textContent = c; tr.appendChild(td); }
+    if (Math.abs(x.residual) > 1e-6) tr.style.color = "var(--series-8)";
+    r.appendChild(tr);
+  }
+}
+let built = false;
+$("tbl-btn").addEventListener("click", () => {
+  const on = $("cardT").hidden;
+  if (on && !built){ buildTables(); built = true; }
+  $("cardT").hidden = !on;
+  $("tbl-btn").setAttribute("aria-pressed", String(on));
+});
+$("thm-btn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+});
+$("foot").textContent =
+  "分数是累加出来的，不是算出来的：新值 = 旧值 + 增量，夹在 0–2 之间。" +
+  "整个过程没有目标函数、没有时间衰减，读视频本身也不会改分——每一次改动都要模型主动发起一次工具调用。";
+</script></body></html>
